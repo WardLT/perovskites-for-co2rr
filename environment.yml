@@ -1,0 +1,20 @@
+name: vfp_defects
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core dependencies
+  - python==3.10
+  - matplotlib
+  - scikit-learn>=1
+  - jupyterlab
+  - pandas
+  - pytest
+  - flake8
+  - tqdm
+  - pip
+  - pymatgen==2022.7.25
+  - matminer==0.7.0
+  - pip:
+    - git+https://gitlab.com/ase/ase.git
+
