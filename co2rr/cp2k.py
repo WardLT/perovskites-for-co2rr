@@ -8,10 +8,11 @@ _pp_val = {
     'K': 9,  # 4s
     'Fe': 16,
     'As': 5,  # 4p
-    'Nb': 13, 'Ag': 11,  # 4d TM
+    'Nb': 13, 'Mo': 14, 'Ag': 11,  # 4d TM
     'Rb': 9,  # 5s
     'Ba': 10,  # 6s
-    'Eu': 17, 'Yb': 34,  # Lathanides
+    'Hf': 12,  # 5f
+    'Eu': 17, 'Yb': 34,  # Lanthanides
     'Ta': 13,  # 5d TM
     'Bi': 5
 }
@@ -19,14 +20,14 @@ _basis_level = {
 }
 
 
-def make_kind_sections(elems: list[str]) -> tuple[str, int]:
+def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
     """Make the &KIND section of a CP2K input file
 
     Args:
         elems: List of elements in a file
     Returns:
         - &KIND sections ready to paste into input file
-        - Required multiplicity
+        - Whether we need UKS
     """
 
     output = []
@@ -47,20 +48,20 @@ def make_kind_sections(elems: list[str]) -> tuple[str, int]:
             basis = f'{level}-MOLOPT-SR-GTH-q{val}'
 
         # Assign DFT+U Values
-        _oqmd_u_values = {
-            "V": 3.1,
-            "Cr": 3.5,
-            "Mn": 3.8,
-            "Fe": 4.0,
-            "Co": 3.3,
-            "Ni": 6.4,
-            "Cu": 4.0,
-            "Th": 4.0,
-            "U": 4.0,
-            "Np": 4.0,
-            "Pu": 4.0,
-        }
-        u_value = _oqmd_u_values.get(elem, None)
+        # _oqmd_u_values = {
+        #     "V": 3.1,
+        #     "Cr": 3.5,
+        #     "Mn": 3.8,
+        #     "Fe": 4.0,
+        #     "Co": 3.3,
+        #     "Ni": 6.4,
+        #     "Cu": 4.0,
+        #     "Th": 4.0,
+        #     "U": 4.0,
+        #     "Np": 4.0,
+        #     "Pu": 4.0,
+        # }
+        # u_value = _oqmd_u_values.get(elem, None)
 
         # Get the magnetization
         if 21 <= z <= 30:
@@ -78,18 +79,18 @@ def make_kind_sections(elems: list[str]) -> tuple[str, int]:
     MAGNETIZATION {magmom}
 """
 
-        if u_value is not None:
-            subsys += f"""\n&DFT_PLUS_U
-    L 2
-    U_MINUS_J [eV] {u_value}
- &END"""
+        #        if u_value is not None:
+        #            subsys += f"""\n&DFT_PLUS_U
+        #    L 2
+        #    U_MINUS_J [eV] {u_value}
+        # &END"""
 
         subsys += "\n&END KIND"""
         output.append(subsys)
-    return "\n".join(output), 1 if unpaired == 0 else unpaired + 1
+    return "\n".join(output), unpaired == 0 or total_e % 2 == 1
 
 
-def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: int = 0) -> CP2K:
+def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: int = 0, uks: bool = False, outer_scf: int = 5) -> CP2K:
     """
     Make a calculator ready for a certain set of atoms
 
@@ -100,11 +101,13 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
         cutoff: Cutoff in Ry
         max_scf: Maximum number of SCF steps
         charge: Total charge on the system
+        uks: Perform a spin-unrestricted calculation, regardless of magnetic or not
+        outer_scf: Number of outer SCF steps
     Returns:
         A CP2K calculator
     """
 
-    kind, mult = make_kind_sections(atoms.get_chemical_symbols())
+    kind, uks_my = make_kind_sections(atoms.get_chemical_symbols())
 
     # Determine what kind of periodicity is required
     psolver = ''
@@ -124,8 +127,7 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
     BASIS_SET_FILE_NAME BASIS_MOLOPT
     BASIS_SET_FILE_NAME BASIS_MOLOPT_UCL
     BASIS_SET_FILE_NAME BASIS_MOLOPT_LnPP1
-    MULTIPLICITY {mult}
-    UKS {"T" if mult > 1 else "F"}
+    UKS {"T" if uks_my or uks else "F"}
     CHARGE {charge}
     &QS
         METHOD GPW
@@ -133,10 +135,13 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
     &SCF
         EPS_SCF 1.0E-5
         IGNORE_CONVERGENCE_FAILURE
+        &OUTER_SCF
+            MAX_SCF {outer_scf}
+        &END OUTER_SCF
         &OT
             ALGORITHM IRAC
             MINIMIZER CG
-            NDIIS 8
+            # NDIIS 8
             PRECONDITIONER FULL_SINGLE_INVERSE
         &END OT
     &END SCF
@@ -167,7 +172,7 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
 """,
         xc=None,
         cutoff=cutoff * units.Ry,
-        max_scf=max_scf,
+        max_scf=max_scf // outer_scf,
         basis_set_file=None,
         basis_set=None,
         pseudo_potential=None,
