@@ -49,15 +49,16 @@ if __name__ == "__main__":
             atoms.pbc = [True, True, False]  # No periodicity in the Z direction
             logger.info('Starting a new run')
 
-        # Redo the fixes
-        indices = np.argsort(atoms.positions[:, 2])[:len(atoms) // 2]
-        atoms.set_constraint(FixAtoms(indices=indices))
-
-        # Load the charge
-        charge = json.loads((surface.parent / 'info.json').read_text())['charge']
+        # Fix the atoms in the middle third center of the structure
+        top_z = np.max(atoms.positions[:, 2])
+        bot_z = np.min(atoms.positions[:, 2])
+        depth = top_z - bot_z
+        mask = np.logical_and(atoms.positions[:, 2] > bot_z + depth / 3,
+                              atoms.positions[:, 2] < top_z - depth / 3)
+        atoms.set_constraint(FixAtoms(mask=mask))
 
         # Run the optimization
-        with make_calculator(atoms, cutoff=600, max_scf=500, charge=0) as calc:
+        with make_calculator(atoms, cutoff=600, max_scf=500, uks=True) as calc:
             # Delete the old run
             for f in ['cp2k.out']:
                 Path(f'run/{f}').write_text("")  # Clear it
