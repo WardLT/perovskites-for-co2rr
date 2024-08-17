@@ -9,10 +9,10 @@ _pp_val = {
     'Na': 9, 'Mg': 10,
     'K': 9, 'Ca': 10,  # 4s
     'Al': 3,  # 3p
-    'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11,  # 3d TM
+    'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11, 'Zn': 12, # 3d TM
     'Ga': 13, 'Ge': 4, 'As': 5,  # 4p
     'Rb': 9, 'Sr': 10,  # 5s
-    'Zr': 12, 'Nb': 13, 'Mo': 14, 'Tc': 15, 'Ru': 16, 'Rh': 17, 'Pd': 18, 'Ag': 11, 'Cd': 12,  # 4d TM
+    'Y': 11, 'Zr': 12, 'Nb': 13, 'Mo': 14, 'Tc': 15, 'Ru': 16, 'Rh': 17, 'Pd': 18, 'Ag': 11, 'Cd': 12,  # 4d TM
     'In': 13, 'Sn': 4,  # 5p
     'Cas': 9, 'Ba': 10,  # 6s
     'La': 11, 'Hf': 12, 'Ta': 13, 'W': 14, 'Os': 16, 'Ir': 17, 'Pt': 18, 'Au': 11, 'Hg': 12,  # 5d TM
@@ -68,10 +68,11 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
         # u_value = _oqmd_u_values.get(elem, None)
 
         # Get the magnetization
+        is_ln = 57 <= z <= 69
         if 21 <= z <= 30:
-            magmom = min(5, z - 21)
-        elif 57 <= z <= 69:  # Lu,Yb have full f shells. Skip magnetization
-            magmom = min(7, z - 57)
+            magmom = min(5, z - 20 if z < 26 else 30 - z)
+        elif 57 <= z <= 67:  # Er,Tm,Lu,Yb have full f or d shells. Skip magnetization
+            magmom = min(5, z - 57 if z < 64 else 71 -z)
         else:
             magmom = 0
         unpaired += elems.count(elem) * magmom
