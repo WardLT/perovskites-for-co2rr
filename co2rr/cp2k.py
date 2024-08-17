@@ -90,7 +90,15 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
     return "\n".join(output), unpaired == 0 or total_e % 2 == 1
 
 
-def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: int = 0, uks: bool = False, outer_scf: int = 5) -> CP2K:
+def make_calculator(
+        atoms: Atoms, 
+        cutoff: int = 500, 
+        max_scf: int = 64, 
+        charge: int = 0,
+        uks: bool = False, 
+        outer_scf: int = 5,
+        command: str | None = None
+    ) -> CP2K:
     """
     Make a calculator ready for a certain set of atoms
 
@@ -101,8 +109,9 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
         cutoff: Cutoff in Ry
         max_scf: Maximum number of SCF steps
         charge: Total charge on the system
-        uks: Perform a spin-unrestricted calculation, regardless of magnetic or not
+        uks: Perform a spin-unrestricted calculation, regardless whether magnetic or not
         outer_scf: Number of outer SCF steps
+        command: CP2K command
     Returns:
         A CP2K calculator
     """
@@ -178,5 +187,5 @@ def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: 
         pseudo_potential=None,
         potential_file=None,
         stress_tensor=all(atoms.pbc),
-        command='/home/lward/Software/cp2k-2024.1/exe/local/cp2k_shell.ssmp'
+        command=command
     )
