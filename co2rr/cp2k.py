@@ -4,17 +4,21 @@ from ase.calculators.cp2k import CP2K
 from ase import data, units, Atoms
 
 _pp_val = {
+    'Li': 3, 'Be': 4,
     'O': 6,
-    'K': 9,  # 4s
-    'Fe': 16,
-    'As': 5,  # 4p
-    'Nb': 13, 'Mo': 14, 'Ag': 11,  # 4d TM
-    'Rb': 9,  # 5s
-    'Ba': 10,  # 6s
-    'Hf': 12,  # 5f
-    'Eu': 17, 'Yb': 34,  # Lanthanides
-    'Ta': 13,  # 5d TM
-    'Bi': 5
+    'Na': 9, 'Mg': 10,
+    'K': 9, 'Ca': 10,  # 4s
+    'Al': 3,  # 3p
+    'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11,  # 3d TM
+    'Ga': 13, 'Ge': 4, 'As': 5,  # 4p
+    'Rb': 9, 'Sr': 10,  # 5s
+    'Zr': 12, 'Nb': 13, 'Mo': 14, 'Tc': 15, 'Ru': 16, 'Rh': 17, 'Pd': 18, 'Ag': 11, 'Cd': 12,  # 4d TM
+    'In': 13, 'Sn': 4,  # 5p
+    'Cas': 9, 'Ba': 10,  # 6s
+    'La': 11, 'Hf': 12, 'Ta': 13, 'W': 14, 'Os': 16, 'Ir': 17, 'Pt': 18, 'Au': 11, 'Hg': 12,  # 5d TM
+    'Ce': 12, 'Pr': 13, 'Nd': 14, 'Pm': 15, 'Sm': 16, 'Eu': 17, 'Gd': 18,
+    'Tb': 29, 'Dy': 30, 'Ho': 31, 'Er': 32, 'Tm': 33, 'Yb': 34, 'Lu': 35,  # Lanthanides
+    'Tl': 13, 'Pb': 4, 'Bi': 5  # 6p
 }
 _basis_level = {
 }
@@ -65,9 +69,9 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
 
         # Get the magnetization
         if 21 <= z <= 30:
-            magmom = 5
+            magmom = min(5, z - 21)
         elif 57 <= z <= 69:  # Lu,Yb have full f shells. Skip magnetization
-            magmom = 7
+            magmom = min(7, z - 57)
         else:
             magmom = 0
         unpaired += elems.count(elem) * magmom
@@ -87,7 +91,7 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
 
         subsys += "\n&END KIND"""
         output.append(subsys)
-    return "\n".join(output), unpaired == 0 or total_e % 2 == 1
+    return "\n".join(output), unpaired != 0 or total_e % 2 == 1
 
 
 def make_calculator(atoms: Atoms, cutoff: int = 500, max_scf: int = 64, charge: int = 0, uks: bool = False, outer_scf: int = 5) -> CP2K:
