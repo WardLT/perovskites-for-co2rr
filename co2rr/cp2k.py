@@ -52,20 +52,20 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
             basis = f'{level}-MOLOPT-SR-GTH-q{val}'
 
         # Assign DFT+U Values
-        # _oqmd_u_values = {
-        #     "V": 3.1,
-        #     "Cr": 3.5,
-        #     "Mn": 3.8,
-        #     "Fe": 4.0,
-        #     "Co": 3.3,
-        #     "Ni": 6.4,
-        #     "Cu": 4.0,
-        #     "Th": 4.0,
-        #     "U": 4.0,
-        #     "Np": 4.0,
-        #     "Pu": 4.0,
-        # }
-        # u_value = _oqmd_u_values.get(elem, None)
+        _oqmd_u_values = {
+            "V": 3.1,
+            "Cr": 3.5,
+            "Mn": 3.8,
+            "Fe": 4.0,
+            "Co": 3.3,
+            "Ni": 6.4,
+            "Cu": 4.0,
+            "Th": 4.0,
+            "U": 4.0,
+            "Np": 4.0,
+            "Pu": 4.0,
+        }
+        u_value = _oqmd_u_values.get(elem, None)
 
         # Get the magnetization
         is_ln = 57 <= z <= 69
