@@ -16,6 +16,7 @@ if __name__ == "__main__":
     # Make the argument parser
     parser = ArgumentParser()
     parser.add_argument('initial', nargs='+', help='Directory holding initial structures to relax', type=Path)
+    parser.add_argument('--max-steps', default=256, help='Maximum number of relaxation steps', type=int)
     args = parser.parse_args()
 
     # Make the logger
@@ -41,13 +42,21 @@ if __name__ == "__main__":
 
         # Load the file and write as an extended XYZ file
         traj_path = surface.parent / 'relax.traj'
+        start = 0
         if traj_path.exists():
-            atoms = read(traj_path, -1)
-            logger.info(f'Read the last structure from {traj_path}')
+            traj = read(traj_path, ':')
+            start = len(traj)
+            atoms = traj[-1]
+            logger.info(f'Read the last structure out out {start} from {traj_path}')
         else:
             atoms = read(surface)
             atoms.pbc = [True, True, False]  # No periodicity in the Z direction
             logger.info('Starting a new run')
+
+        # Skip if we've already hit the budget
+        if start > args.max_steps:
+            logger.info(f'Already hit the step budget of {args.max_steps}')
+            continue
 
         # Fix the atoms in the middle third center of the structure
         top_z = np.max(atoms.positions[:, 2])
@@ -71,7 +80,7 @@ if __name__ == "__main__":
             opt = BFGS(atoms,
                        logfile=str(surface.parent / 'relax.log'),
                        trajectory=str(traj_path))
-            opt.run(fmax=0.1)
+            opt.run(fmax=0.1, steps=args.max_steps - start)
 
         # Save the relaxed structure
         out_path = surface.parent.joinpath('relaxed.extxyz')
