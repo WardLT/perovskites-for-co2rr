@@ -4,6 +4,7 @@ from pathlib import Path
 import logging
 import json
 import sys
+from uuid import uuid4
 
 import numpy as np
 from ase.constraints import FixAtoms
@@ -67,13 +68,15 @@ if __name__ == "__main__":
         atoms.set_constraint(FixAtoms(mask=mask))
 
         # Run the optimization
+        run_dir = Path('run') / str(uuid4()).split("-")[0]
+        run_dir.mkdir()
         with make_calculator(atoms, cutoff=600, max_scf=500, uks=True) as calc:
             # Delete the old run
             for f in ['cp2k.out']:
-                Path(f'run/{f}').write_text("")  # Clear it
+                (run_dir / f).write_text("")  # Clear it
 
             # Set up the calculator
-            calc.directory = 'run'
+            calc.directory = str(run_dir)
             atoms.calc = calc
 
             # Run the relaxation
