@@ -8,19 +8,21 @@ _pp_val = {
     'O': 6,
     'Na': 9, 'Mg': 10,
     'K': 9, 'Ca': 10,  # 4s
-    'Al': 3,  # 3p
+    'Al': 3, 'Si': 4,  # 3p
     'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11, 'Zn': 12, # 3d TM
     'Ga': 13, 'Ge': 4, 'As': 5,  # 4p
     'Rb': 9, 'Sr': 10,  # 5s
     'Y': 11, 'Zr': 12, 'Nb': 13, 'Mo': 14, 'Tc': 15, 'Ru': 16, 'Rh': 17, 'Pd': 18, 'Ag': 11, 'Cd': 12,  # 4d TM
     'In': 13, 'Sn': 4, 'Sb': 5, # 5p
     'Cs': 9, 'Ba': 10,  # 6s
-    'La': 11, 'Hf': 12, 'Ta': 13, 'W': 14, 'Os': 16, 'Ir': 17, 'Pt': 18, 'Au': 11, 'Hg': 12,  # 5d TM
+    'La': 11, 'Hf': 12, 'Ta': 13, 'W': 14, 'Re': 15, 'Os': 16, 'Ir': 17, 'Pt': 18, 'Au': 11, 'Hg': 12,  # 5d TM
     'Ce': 12, 'Pr': 13, 'Nd': 14, 'Pm': 15, 'Sm': 16, 'Eu': 17, 'Gd': 18,
     'Tb': 29, 'Dy': 30, 'Ho': 31, 'Er': 32, 'Tm': 33, 'Yb': 34, 'Lu': 35,  # Lanthanides
     'Tl': 13, 'Pb': 4, 'Bi': 5  # 6p
 }
 _basis_level = {
+    'Mg': 'TZV2Pd',
+    'Na': 'TZV2Pd'
 }
 
 
@@ -44,8 +46,8 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
         pot = f'GTH-PBE-q{val}'
         if 57 <= z <= 71:
             pot += '\n    POTENTIAL_FILE_NAME LnPP1_POTENTIALS'
-            basis = 'DZV-MOLOPT-SR-GTH'
-        elif z in [6, 8, 1]:
+            basis = 'DZV-MOLOPT-SR-GTH' if z > 57 else 'DZV-MOLOPT-GTH'
+        elif z in [14, 6, 8, 1]:
             basis = 'TZV2P-MOLOPT-GTH'
         else:
             level = _basis_level.get(elem, 'TZV2P')
@@ -192,5 +194,6 @@ def make_calculator(
         pseudo_potential=None,
         potential_file=None,
         stress_tensor=all(atoms.pbc),
+        set_pos_file=True,
         command=command
     )
