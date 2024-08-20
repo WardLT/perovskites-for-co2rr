@@ -13,6 +13,8 @@ from ase.optimize import BFGS
 from co2rr.cp2k import make_calculator
 from co2rr.emery import load_emery_dataset, generate_initial_structure
 
+_problem_names = ['PrTmO3', 'PrAlO3', 'RbNbO3']
+
 if __name__ == "__main__":
     # Make the argument parser
     parser = ArgumentParser(description='Relax the volume of the supercell, holding atomic positions and cubic symmetry constant')
@@ -28,12 +30,18 @@ if __name__ == "__main__":
 
     # Find the structures to relax
     emery = load_emery_dataset()
+    emery = emery.sample(n=len(emery), random_state=1)
     for _, row in emery.iterrows():
         # Check if it's already done
         name = row['Chemical formula']
         with connect('cp2k-relax.db') as db:
             if db.count(name=name, supercell=args.supercell_size) > 0:
                 continue
+
+        # Skip if it's a bad composition
+        #  Some are just problematic to converge
+        if name in _problem_names:
+            continue
 
         # Run, if needed
         atoms = generate_initial_structure(row)
