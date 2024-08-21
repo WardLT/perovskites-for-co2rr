@@ -5,7 +5,7 @@ from ase import data, units, Atoms
 
 _pp_val = {
     'Li': 3, 'Be': 4,
-    'O': 6,
+    'C': 4, 'O': 6,
     'Na': 9, 'Mg': 10,
     'K': 9, 'Ca': 10,  # 4s
     'Al': 3, 'Si': 4,  # 3p
