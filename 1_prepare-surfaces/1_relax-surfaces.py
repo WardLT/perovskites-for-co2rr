@@ -9,7 +9,7 @@ from uuid import uuid4
 import numpy as np
 from ase.constraints import FixAtoms
 from ase.io import read
-from ase.optimize import BFGS
+from ase.optimize import FIRE
 
 from co2rr.cp2k import make_calculator
 
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             atoms.calc = calc
 
             # Run the relaxation
-            opt = BFGS(atoms,
+            opt = FIRE(atoms,
                        logfile=str(surface.parent / 'relax.log'),
                        trajectory=str(traj_path))
             opt.run(fmax=0.1, steps=args.max_steps - start)
