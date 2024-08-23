@@ -1,6 +1,6 @@
 """Relax the surfaces in parallel on HPC"""
+from concurrent.futures import as_completed
 from argparse import ArgumentParser
-from asyncio import as_completed
 from pathlib import Path
 import logging
 import sys
@@ -9,6 +9,7 @@ import parsl
 from parsl import python_app
 from parsl import Config, HighThroughputExecutor
 from parsl.providers import PBSProProvider
+from parsl.launchers import SimpleLauncher
 
 
 @python_app
@@ -24,6 +25,7 @@ def relax_surface(surface: Path, max_steps: int) -> Path:
     from ase.constraints import FixAtoms
     from ase.optimize import FIRE
     from ase.io import read
+    from pathlib import Path
     from co2rr.cp2k import make_calculator
     from uuid import uuid4
     import numpy as np
@@ -103,9 +105,10 @@ if __name__ == "__main__":
             HighThroughputExecutor(
                 max_workers_per_node=1,
                 provider=PBSProProvider(
+                    launcher=SimpleLauncher(),
                     account='co2rr_vfp',
                     min_blocks=0,
-                    max_blocks=4,
+                    max_blocks=10,
                     nodes_per_block=2,
                     walltime='72:00:00',
                     worker_init='''
@@ -116,6 +119,7 @@ which python
 # Load environment
 module load gcc mpich
 module list
+cd $PBS_O_WORKDIR
 
 nnodes=`cat $PBS_NODEFILE | sort | uniq | wc -l`
 ranks_per_node=64
