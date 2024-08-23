@@ -16,5 +16,6 @@ dependencies:
   - pymatgen==2022.7.25
   - matminer==0.7.0
   - pip:
+    - parsl
     - git+https://gitlab.com/ase/ase.git
 
