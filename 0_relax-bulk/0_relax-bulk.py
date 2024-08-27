@@ -13,7 +13,11 @@ from ase.optimize import BFGS
 from co2rr.cp2k import make_calculator
 from co2rr.emery import load_emery_dataset, generate_initial_structure
 
-_problem_names = ['PrTmO3', 'PrAlO3', 'RbNbO3']
+_problem_names = [
+        'PrTmO3', 'PrAlO3', 'RbNbO3', 'TcCsO3', 'EuTmO3', 'PrErO3',
+        'YbZrO3', 'EuErO3', 'CsNbO3', 'LaHoO3', 'OsCsO3', 'AsYbO3',
+        'EuLuO3'
+]
 
 if __name__ == "__main__":
     # Make the argument parser
