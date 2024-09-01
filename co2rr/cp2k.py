@@ -1,4 +1,5 @@
 """Utilities for CP2K"""
+from pathlib import Path
 
 from ase.calculators.cp2k import CP2K
 from ase import data, units, Atoms
@@ -9,11 +10,11 @@ _pp_val = {
     'Na': 9, 'Mg': 10,
     'K': 9, 'Ca': 10,  # 4s
     'Al': 3, 'Si': 4,  # 3p
-    'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11, 'Zn': 12, # 3d TM
+    'Sc': 11, 'Ti': 12, 'V': 13, 'Cr': 14, 'Mn': 15, 'Fe': 16, 'Co': 17, 'Ni': 18, 'Cu': 11, 'Zn': 12,  # 3d TM
     'Ga': 13, 'Ge': 4, 'As': 5,  # 4p
     'Rb': 9, 'Sr': 10,  # 5s
     'Y': 11, 'Zr': 12, 'Nb': 13, 'Mo': 14, 'Tc': 15, 'Ru': 16, 'Rh': 17, 'Pd': 18, 'Ag': 11, 'Cd': 12,  # 4d TM
-    'In': 13, 'Sn': 4, 'Sb': 5, 'Te': 6, # 5p
+    'In': 13, 'Sn': 4, 'Sb': 5, 'Te': 6,  # 5p
     'Cs': 9, 'Ba': 10,  # 6s
     'La': 11, 'Hf': 12, 'Ta': 13, 'W': 14, 'Re': 15, 'Os': 16, 'Ir': 17, 'Pt': 18, 'Au': 11, 'Hg': 12,  # 5d TM
     'Ce': 12, 'Pr': 13, 'Nd': 14, 'Pm': 15, 'Sm': 16, 'Eu': 17, 'Gd': 18,
@@ -74,7 +75,7 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
         if 21 <= z <= 30:
             magmom = min(5, z - 20 if z < 26 else 30 - z)
         elif 57 <= z <= 67:  # Er,Tm,Lu,Yb have full f or d shells. Skip magnetization
-            magmom = min(5, z - 57 if z < 64 else 71 -z)
+            magmom = min(5, z - 57 if z < 64 else 71 - z)
         else:
             magmom = 0
         unpaired += elems.count(elem) * magmom
@@ -98,14 +99,16 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
 
 
 def make_calculator(
-        atoms: Atoms, 
-        cutoff: int = 500, 
-        max_scf: int = 64, 
+        atoms: Atoms,
+        cutoff: int = 500,
+        max_scf: int = 64,
         charge: int = 0,
-        uks: bool = False, 
+        uks: bool = False,
         outer_scf: int = 5,
-        command: str | None = None
-    ) -> CP2K:
+        command: str | None = None,
+        compute_pdos: bool = False,
+        run_dir: Path = Path('run')
+) -> CP2K:
     """
     Make a calculator ready for a certain set of atoms
 
@@ -119,6 +122,7 @@ def make_calculator(
         uks: Perform a spin-unrestricted calculation, regardless whether magnetic or not
         outer_scf: Number of outer SCF steps
         command: CP2K command
+        compute_pdos: Whether to compute the PDOS, which also adds MOS and changes the optimizer
     Returns:
         A CP2K calculator
     """
@@ -135,6 +139,43 @@ def make_calculator(
     POISSON_SOLVER MT
     &END POISSON
 """
+
+    # Decide the SCF algorithm
+    if compute_pdos:
+#        scf = f"""ADDED_MOS 100
+# &DIAGONALIZATION
+#    ALGORITHM STANDARD
+#    EPS_ADAPT 0.01
+# &END DIAGONALIZATION
+# &SMEAR  ON
+#    METHOD FERMI_DIRAC
+#    ELECTRONIC_TEMPERATURE [K] 300
+# &END SMEAR
+#
+# &MIXING
+#    METHOD BROYDEN_MIXING
+#    ALPHA 0.2
+#    BETA 1.5
+#    NBROYDEN 8
+# &END MIXING"""
+        outputs = f"""&PRINT
+     &PDOS
+        # print all projected DOS available:
+        NLUMO -1
+        # split the density by quantum number:
+        COMPONENTS
+        FILENAME {run_dir}/run
+     &END
+&END PRINT"""
+    else:
+        outputs = ""
+    scf = """
+&OT
+    ALGORITHM IRAC
+    MINIMIZER CG
+    # NDIIS 8
+    PRECONDITIONER FULL_SINGLE_INVERSE
+&END OT"""
 
     return CP2K(
         inp=f"""
@@ -154,12 +195,7 @@ def make_calculator(
         &OUTER_SCF
             MAX_SCF {outer_scf}
         &END OUTER_SCF
-        &OT
-            ALGORITHM IRAC
-            MINIMIZER CG
-            # NDIIS 8
-            PRECONDITIONER FULL_SINGLE_INVERSE
-        &END OT
+        {scf}
     &END SCF
     {psolver}
     &XC
@@ -180,6 +216,7 @@ def make_calculator(
         NGRIDS 5
         REL_CUTOFF 50
     &END MGRID
+    {outputs}
 &END DFT
 &SUBSYS
     {kind}
@@ -195,5 +232,6 @@ def make_calculator(
         potential_file=None,
         stress_tensor=all(atoms.pbc),
         set_pos_file=True,
-        command=command
+        command=command,
+        directory=run_dir
     )

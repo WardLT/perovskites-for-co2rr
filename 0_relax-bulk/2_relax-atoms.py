@@ -6,7 +6,7 @@ import sys
 
 from ase.db import connect
 from ase.filters import FrechetCellFilter
-from ase.optimize import FIRE
+from ase.optimize import BFGS
 from ase.io import read
 
 from co2rr.cp2k import make_calculator
@@ -14,7 +14,7 @@ from co2rr.cp2k import make_calculator
 
 _problem_names = [
     # Structures which transform on relaxation
-    'EuOsO3'
+    'EuOsO3', 'TmCoO3'
 ]
 
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     
                     # Run the optimization
                     opt_atoms = FrechetCellFilter(atoms)  # Allow ASE to optimize the lattice parameter
-                    opt = FIRE(opt_atoms, 
+                    opt = BFGS(opt_atoms,
                                trajectory=str(traj_dir / 'relax.traj'),
                                logfile=str(traj_dir / 'relax.log'))
                     opt.run(fmax=0.1, steps=args.max_steps)
