@@ -1,4 +1,5 @@
 """Utilities for CP2K"""
+from shutil import copyfile
 from pathlib import Path
 
 from ase.calculators.cp2k import CP2K
@@ -107,7 +108,8 @@ def make_calculator(
         outer_scf: int = 5,
         command: str | None = None,
         compute_pdos: bool = False,
-        run_dir: Path = Path('run')
+        run_dir: Path = Path('run'),
+        wfn_guess: Path | None = None
 ) -> CP2K:
     """
     Make a calculator ready for a certain set of atoms
@@ -122,7 +124,9 @@ def make_calculator(
         uks: Perform a spin-unrestricted calculation, regardless whether magnetic or not
         outer_scf: Number of outer SCF steps
         command: CP2K command
-        compute_pdos: Whether to compute the PDOS, which also adds MOS and changes the optimizer
+        compute_pdos: Whether to compute the PDOS, which also adds MOS and changes the optimizer.
+          Also prints the charge information
+        wfn_guess: Path to a wfn backup file to use as the starting point
     Returns:
         A CP2K calculator
     """
@@ -142,22 +146,6 @@ def make_calculator(
 
     # Decide the SCF algorithm
     if compute_pdos:
-#        scf = f"""ADDED_MOS 100
-# &DIAGONALIZATION
-#    ALGORITHM STANDARD
-#    EPS_ADAPT 0.01
-# &END DIAGONALIZATION
-# &SMEAR  ON
-#    METHOD FERMI_DIRAC
-#    ELECTRONIC_TEMPERATURE [K] 300
-# &END SMEAR
-#
-# &MIXING
-#    METHOD BROYDEN_MIXING
-#    ALPHA 0.2
-#    BETA 1.5
-#    NBROYDEN 8
-# &END MIXING"""
         outputs = f"""&PRINT
      &PDOS
         # print all projected DOS available:
@@ -166,6 +154,10 @@ def make_calculator(
         COMPONENTS
         FILENAME {run_dir}/run
      &END
+      &E_DENSITY_CUBE ON
+        FILENAME ={run_dir}/valence_density.cube
+        STRIDE 1 1 1
+      &END E_DENSITY_CUBE
 &END PRINT"""
     else:
         outputs = ""
@@ -176,6 +168,10 @@ def make_calculator(
     # NDIIS 8
     PRECONDITIONER FULL_SINGLE_INVERSE
 &END OT"""
+
+    if wfn_guess is not None:
+        copyfile(wfn_guess, run_dir / 'cp2k-RESTART.wfn')
+        scf += "\nSCF_GUESS RESTART"
 
     return CP2K(
         inp=f"""

@@ -42,10 +42,15 @@ if __name__ == "__main__":
             if pdos_path.exists():
                 continue
 
+            # Find the WFN file for a restart
+            wfn_path = traj_dir / 'pbe-plus-u.wfn'
+            if not wfn_path.exists():
+                wfn_path = None  # Skip if not available
+
             # Run pdos calculation
             atoms = row.toatoms()
             run_dir = Path('run')
-            with make_calculator(atoms, cutoff=600, max_scf=500, compute_pdos=True) as calc:
+            with make_calculator(atoms, cutoff=600, max_scf=500, compute_pdos=True, wfn_guess=wfn_path) as calc:
                 # Delete the old run
                 for f in ['cp2k.out']:
                     Path(run_dir / f).write_text("")  # Clear it
@@ -70,6 +75,11 @@ if __name__ == "__main__":
                 raise ValueError('No PDOS files were written (or found)')
             logger.info(f'Wrote {pdos_path} PDOS files to {pdos_path}')
 
+            # Copy the charge information
+            chg_file = run_dir / 'valence_density.cube'
+            chg_file.rename(traj_dir / 'pbe-plus-u.cube')
+            logger.info('Moved the cube file')
+
             # Store the wfn file
-            (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / 'pbs-plus-u.wfn')
+            (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / 'pbe-plus-u.wfn')
             logger.info('Stored the wfn file as a backup')
