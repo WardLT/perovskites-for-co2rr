@@ -55,6 +55,7 @@ if __name__ == "__main__":
                     logger.info('Read last step from ongoing trajectory')
                 else:
                     atoms = row.toatoms()
+                    atoms.rattle()  # Break symmetry
                     logger.info('Starting from cubic structure')
     
                 # Run relaxation
@@ -77,8 +78,7 @@ if __name__ == "__main__":
                     opt.run(fmax=0.1, steps=args.max_steps)
                     stresses = atoms.get_stress()
                     logger.info(f'{name} - Final volume: {atoms.get_volume() / len(atoms):.2f}. Stress: {stresses[:3].sum() / 3:.2f}')
-    
-    
+   
                 # Write to the output
                 with connect('atoms-relax.db') as db_out:
                     new_keys = row.key_value_pairs.copy()
