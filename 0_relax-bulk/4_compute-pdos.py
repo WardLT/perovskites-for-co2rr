@@ -1,8 +1,10 @@
 """Relax the atomic degrees of freedom"""
 from argparse import ArgumentParser
 from tarfile import TarFile
+from shutil import copyfileobj
 from pathlib import Path
 import logging
+import gzip
 import sys
 
 from ase.db import connect
@@ -73,12 +75,19 @@ if __name__ == "__main__":
             if pdos_count == 0:
                 pdos_path.unlink()
                 raise ValueError('No PDOS files were written (or found)')
-            logger.info(f'Wrote {pdos_path} PDOS files to {pdos_path}')
+            logger.info(f'Wrote {pdos_count} PDOS files to {pdos_path}')
 
             # Copy the charge information
-            chg_file = run_dir / 'valence_density.cube'
-            chg_file.rename(traj_dir / 'pbe-plus-u.cube')
-            logger.info('Moved the cube file')
+            chg_file = next(run_dir.glob('density-ELECTRON_DENSITY-*.cube'))
+            with gzip.open(traj_dir / 'pbe-plus-u.cube.gz', 'wb') as fo:
+                with chg_file.open('rb') as fi:
+                    copyfileobj(fi, fo)
+            chg_file.unlink()
+            logger.info(f'Moved the cube file from {chg_file}')
+
+            # Copy the mulliken charges
+            mlk_file = run_dir / 'mulliken.charges'
+            mlk_file.rename(traj_dir / 'pbe-plus-u.mulliken.charges')
 
             # Store the wfn file
             (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / 'pbe-plus-u.wfn')

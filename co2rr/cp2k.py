@@ -5,7 +5,7 @@ from pathlib import Path
 from ase.calculators.cp2k import CP2K
 from ase import data, units, Atoms
 
-_pp_val = {
+pp_val = {
     'Li': 3, 'Be': 4,
     'C': 4, 'O': 6,
     'Na': 9, 'Mg': 10,
@@ -44,7 +44,7 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
     for elem in set(elems):
         # Get the valance and basis set
         z = data.atomic_numbers[elem]
-        val = _pp_val[elem]
+        val = pp_val[elem]
         pot = f'GTH-PBE-q{val}'
         if 57 <= z <= 71:
             pot += '\n    POTENTIAL_FILE_NAME LnPP1_POTENTIALS'
@@ -155,9 +155,12 @@ def make_calculator(
         FILENAME {run_dir}/run
      &END
       &E_DENSITY_CUBE ON
-        FILENAME ={run_dir}/valence_density.cube
+        FILENAME {run_dir}/density
         STRIDE 1 1 1
       &END E_DENSITY_CUBE
+      &MULLIKEN ON
+        FILENAME =run/mulliken.charges
+      &END MULLIKEN
 &END PRINT"""
     else:
         outputs = ""
