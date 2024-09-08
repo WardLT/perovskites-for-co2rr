@@ -14,7 +14,13 @@ from co2rr.cp2k import make_calculator
 
 _problem_names = [
     # Structures which transform on relaxation
-    'EuOsO3', 'TmCoO3'
+    'EuOsO3', 'TmCoO3',
+
+    # Electronic structure fails to converge
+    "Ce(Tm7Al1)O3", "Ce(Al7Tm1)O3",
+
+    # Failing for unknown reasons
+    'LaTlO3'
 ]
 
 
@@ -84,3 +90,7 @@ if __name__ == "__main__":
                     new_keys = row.key_value_pairs.copy()
                     new_keys['name'] = name
                     db_out.write(atoms, **new_keys)
+
+                # Store the wfn file
+                Path('run/cp2k-RESTART.wfn').rename(traj_dir / 'pbe-plus-u.wfn')
+                logger.info('Stored the wfn file as a backup')
