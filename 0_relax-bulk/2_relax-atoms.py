@@ -39,7 +39,7 @@ if __name__ == "__main__":
     logger.setLevel(logging.INFO)
 
     # Loop over structures in the 'volume-relax.db' database
-    for path in ['initial-dilute-mixing.db', 'volume-relax.db']:
+    for path in ['volume-relax.db', 'initial-dilute-mixing.db']:
         with connect(path) as db_in:
             for row in db_in.select(supercell=args.supercell_size):
                 # Skip problematic structures
@@ -56,8 +56,10 @@ if __name__ == "__main__":
                 traj_dir = Path('atoms-relax') / name / f'{args.supercell_size}-cells'
                 logger.info(f'Running {name} from {path} in {traj_dir}')
                 traj_dir.mkdir(parents=True, exist_ok=True)
+                cur_step = 0
                 if (traj_dir / 'relax.traj').exists():
                     atoms = read(traj_dir / 'relax.traj', -1)
+                    cur_step = len(read(traj_dir / 'relax.traj', ':'))
                     logger.info('Read last step from ongoing trajectory')
                 else:
                     atoms = row.toatoms()
@@ -81,7 +83,7 @@ if __name__ == "__main__":
                     opt = BFGS(opt_atoms,
                                trajectory=str(traj_dir / 'relax.traj'),
                                logfile=str(traj_dir / 'relax.log'))
-                    opt.run(fmax=0.1, steps=args.max_steps)
+                    opt.run(fmax=0.1, steps=args.max_steps - cur_step)
                     stresses = atoms.get_stress()
                     logger.info(f'{name} - Final volume: {atoms.get_volume() / len(atoms):.2f}. Stress: {stresses[:3].sum() / 3:.2f}')
    
