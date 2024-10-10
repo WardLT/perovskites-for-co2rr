@@ -1,8 +1,10 @@
 """Relax the atomic degrees of freedom"""
 from argparse import ArgumentParser
 from tarfile import TarFile
+from shutil import copyfileobj
 from pathlib import Path
 import logging
+import gzip
 import sys
 
 from ase.db import connect
@@ -19,6 +21,7 @@ if __name__ == "__main__":
     parser = ArgumentParser(description='Relax the volume of the supercell, holding atomic positions and cubic symmetry constant')
     parser.add_argument('--supercell-size', default=2, type=int, help='Number of repeats of the supercell')
     parser.add_argument('--max-steps', default=128, type=int, help='Maximum number of optimization steps')
+    parser.add_argument('--xc-name', default="pbe-plus-u", help='Which XC functional to use')
     args = parser.parse_args()
 
     # Make the logger
@@ -38,7 +41,7 @@ if __name__ == "__main__":
 
             # Check if it's already done
             traj_dir = Path('atoms-relax') / name / f'{args.supercell_size}-cells'
-            pdos_path = traj_dir / 'pdos.pbe-plus-u.tar.gz'
+            pdos_path = traj_dir / f'pdos.{args.xc_name}.tar.gz'
             if pdos_path.exists():
                 continue
 
@@ -50,7 +53,11 @@ if __name__ == "__main__":
             # Run pdos calculation
             atoms = row.toatoms()
             run_dir = Path('run')
-            with make_calculator(atoms, cutoff=600, max_scf=500, compute_pdos=True, wfn_guess=wfn_path) as calc:
+            with make_calculator(atoms, xc_name=args.xc_name,
+                                 cutoff=600 if args.xc_name == 'pbe-plus-u' else 400,
+                                 max_scf=500,
+                                 compute_pdos=True,
+                                 wfn_guess=wfn_path) as calc:
                 # Delete the old run
                 for f in ['cp2k.out']:
                     Path(run_dir / f).write_text("")  # Clear it
@@ -73,13 +80,20 @@ if __name__ == "__main__":
             if pdos_count == 0:
                 pdos_path.unlink()
                 raise ValueError('No PDOS files were written (or found)')
-            logger.info(f'Wrote {pdos_path} PDOS files to {pdos_path}')
+            logger.info(f'Wrote {pdos_count} PDOS files to {pdos_path}')
 
             # Copy the charge information
-            chg_file = run_dir / 'valence_density.cube'
-            chg_file.rename(traj_dir / 'pbe-plus-u.cube')
-            logger.info('Moved the cube file')
+            chg_file = next(run_dir.glob('density-ELECTRON_DENSITY-*.cube'))
+            with gzip.open(traj_dir / f'{args.xc_name}.cube.gz', 'wb') as fo:
+                with chg_file.open('rb') as fi:
+                    copyfileobj(fi, fo)
+            chg_file.unlink()
+            logger.info(f'Moved the cube file from {chg_file}')
+
+            # Copy the mulliken charges
+            mlk_file = run_dir / 'mulliken.charges'
+            mlk_file.rename(traj_dir / f'{args.xc_name}.mulliken.charges')
 
             # Store the wfn file
-            (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / 'pbe-plus-u.wfn')
+            (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / f'{args.xc_name}.wfn')
             logger.info('Stored the wfn file as a backup')

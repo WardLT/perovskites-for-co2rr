@@ -5,7 +5,7 @@ from pathlib import Path
 from ase.calculators.cp2k import CP2K
 from ase import data, units, Atoms
 
-_pp_val = {
+pp_val = {
     'Li': 3, 'Be': 4,
     'C': 4, 'O': 6,
     'Na': 9, 'Mg': 10,
@@ -44,7 +44,7 @@ def make_kind_sections(elems: list[str]) -> tuple[str, bool]:
     for elem in set(elems):
         # Get the valance and basis set
         z = data.atomic_numbers[elem]
-        val = _pp_val[elem]
+        val = pp_val[elem]
         pot = f'GTH-PBE-q{val}'
         if 57 <= z <= 71:
             pot += '\n    POTENTIAL_FILE_NAME LnPP1_POTENTIALS'
@@ -106,6 +106,7 @@ def make_calculator(
         charge: int = 0,
         uks: bool = False,
         outer_scf: int = 5,
+        xc_name: str = 'pbe-plus-u',
         command: str | None = None,
         compute_pdos: bool = False,
         run_dir: Path = Path('run'),
@@ -155,9 +156,12 @@ def make_calculator(
         FILENAME {run_dir}/run
      &END
       &E_DENSITY_CUBE ON
-        FILENAME ={run_dir}/valence_density.cube
+        FILENAME {run_dir}/density
         STRIDE 1 1 1
       &END E_DENSITY_CUBE
+      &MULLIKEN ON
+        FILENAME =run/mulliken.charges
+      &END MULLIKEN
 &END PRINT"""
     else:
         outputs = ""
@@ -172,6 +176,51 @@ def make_calculator(
     if wfn_guess is not None:
         copyfile(wfn_guess, run_dir / 'cp2k-RESTART.wfn')
         scf += "\nSCF_GUESS RESTART"
+
+    # Choose the XC functional
+    if xc_name == 'pbe-plus-u':
+        xc_block = """&XC_FUNCTIONAL
+    &PBE
+    &END PBE
+&END XC_FUNCTIONAL
+&VDW_POTENTIAL
+    DISPERSION_FUNCTIONAL NON_LOCAL
+    &NON_LOCAL
+      TYPE RVV10
+      KERNEL_FILE_NAME rVV10_kernel_table.dat
+      PARAMETERS 9.3 9.3E-003
+    &END NON_LOCAL
+&END VDW_POTENTIAL"""
+    elif xc_name == 'hse':
+        xc_block = """&XC_FUNCTIONAL
+    &PBE
+    SCALE_X 0.0
+    SCALE_C 1.0
+    &END PBE
+    &XWPBE
+        SCALE_X -0.25
+        SCALE_X0 1.0
+        OMEGA 0.11
+    &END XWPBE
+&END XC_FUNCTIONAL
+&HF
+    &SCREENING
+        EPS_SCHWARZ 1.0E-6
+        SCREEN_ON_INITIAL_P FALSE
+    &END SCREENING
+    &INTERACTION_POTENTIAL
+    POTENTIAL_TYPE SHORTRANGE
+    OMEGA 0.11
+    &END INTERACTION_POTENTIAL
+    &MEMORY
+    MAX_MEMORY 2400
+    EPS_STORAGE_SCALING 0.1
+    &END MEMORY
+    FRACTION 0.25
+&END HF
+"""
+    else:
+        raise NotImplementedError()
 
     return CP2K(
         inp=f"""
@@ -195,18 +244,7 @@ def make_calculator(
     &END SCF
     {psolver}
     &XC
-        &XC_FUNCTIONAL
-            &PBE
-            &END PBE
-        &END XC_FUNCTIONAL
-        &VDW_POTENTIAL
-            DISPERSION_FUNCTIONAL NON_LOCAL
-            &NON_LOCAL
-              TYPE RVV10
-              KERNEL_FILE_NAME rVV10_kernel_table.dat
-              PARAMETERS 9.3 9.3E-003
-            &END NON_LOCAL
-        &END VDW_POTENTIAL
+        {xc_block}
     &END XC
     &MGRID
         NGRIDS 5
