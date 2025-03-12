@@ -1,6 +1,6 @@
 """Relax the atomic degrees of freedom"""
 from argparse import ArgumentParser
-from asyncio import as_completed
+from concurrent.futures import as_completed
 from pathlib import Path
 import logging
 import sys
@@ -15,12 +15,14 @@ from parsl.providers import PBSProProvider
 from parsl.launchers import SimpleLauncher
 
 
-def run_optimization(atoms: ase.Atoms, run_dir: Path) -> ase.Atoms:
+@python_app
+def run_optimization(atoms: ase.Atoms, run_dir: Path, max_steps: int) -> ase.Atoms:
     """Perform an optimization in a directory"""
     from ase.filters import FrechetCellFilter
     from ase.optimize import BFGS
     from ase.io import read
     from pathlib import Path
+    from uuid import uuid4
     import logging
 
     from co2rr.cp2k import make_calculator
@@ -28,7 +30,6 @@ def run_optimization(atoms: ase.Atoms, run_dir: Path) -> ase.Atoms:
     logger = logging.getLogger('opt')
 
     # Start with last step in the trajectory, if available
-    logger.info(f'Running {name} from {path} in {run_dir}')
     run_dir.mkdir(parents=True, exist_ok=True)
     cur_step = 0
     if (run_dir / 'relax.traj').exists():
@@ -51,19 +52,17 @@ def run_optimization(atoms: ase.Atoms, run_dir: Path) -> ase.Atoms:
         calc.directory = cp2k_dir
         atoms.calc = calc
         stresses = atoms.get_stress()
-        logger.info(f'{name} - Initial volume: {atoms.get_volume() / len(atoms):.2f}. Stress: {stresses[:3].sum() / 3:.2f}')
 
         # Run the optimization
         opt_atoms = FrechetCellFilter(atoms)  # Allow ASE to optimize the lattice parameter
         opt = BFGS(opt_atoms,
                    trajectory=str(run_dir / 'relax.traj'),
                    logfile=str(run_dir / 'relax.log'))
-        opt.run(fmax=0.1, steps=args.max_steps - cur_step)
+        opt.run(fmax=0.1, steps=max_steps - cur_step)
         stresses = atoms.get_stress()
-        logger.info(f'{name} - Final volume: {atoms.get_volume() / len(atoms):.2f}. Stress: {stresses[:3].sum() / 3:.2f}')
 
         # Copy the wfn file
-        (run_dir / 'cp2k-RESTART.wfn').rename(traj_dir / f'pbe-plus-u.wfn')
+        (cp2k_dir / 'cp2k-RESTART.wfn').rename(run_dir / f'pbe-plus-u.wfn')
 
     return atoms
 
@@ -102,9 +101,9 @@ if __name__ == "__main__":
                     launcher=SimpleLauncher(),
                     account='co2rr_vfp',
                     min_blocks=0,
-                    max_blocks=4,
-                    nodes_per_block=2,
-                    walltime='72:00:00',
+                    max_blocks=8,
+                    nodes_per_block=1,
+                    walltime='16:00:00',
                     worker_init='''
 # Load the conda environment
 source activate /lcrc/project/co2rr_vfp/perovskites-for-co2rr/env
@@ -146,16 +145,19 @@ export ASE_CP2K_COMMAND="mpiexec -n $total_ranks -ppn $ranks_per_node --bind-to 
                         continue
 
                 traj_dir = Path('atoms-relax') / name / f'{args.supercell_size}-cells'
-                future = run_optimization(row.toatoms(), traj_dir)
+                future = run_optimization(row.toatoms(), traj_dir, args.max_steps)
                 future.kv = row.key_value_pairs.copy()
                 future.kv['name'] = name
+                futures.append(future)
+                logger.info(f'Submitted {name} from {path}')
 
-    for future in as_completed(futures):
+    for i, future in enumerate(as_completed(futures)):
         if future.exception():
             logger.error(f'Failed due to: {future.exception()}')
         else:
             # Write to the output
             atoms = future.result()
+            logger.info(f'Completed {future.kv["name"]}. Remaining: {len(futures) - i - 1}')
             with connect('atoms-relax.db') as db_out:
                 db_out.write(atoms, **future.kv)
 
